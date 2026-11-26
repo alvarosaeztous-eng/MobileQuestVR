@@ -155,6 +155,7 @@ export class StereoRenderer {
 
     this.stereoEnabled = false;
     this.barrelDistortionEnabled = true;
+    this.forceDirectStereo = false; // Enabled automatically when CSS3D YouTube 3D screen is open so WebGL & CSS3D align pixel-for-pixel
 
     this.monoCamera = new THREE.PerspectiveCamera(this.monoFov, 1, this.near, this.far);
     this.leftCamera = new THREE.PerspectiveCamera(this.verticalFov, 1, this.near, this.far);
@@ -296,6 +297,14 @@ export class StereoRenderer {
     return this.barrelDistortionEnabled;
   }
 
+  setForceDirectStereo(forceDirect) {
+    this.forceDirectStereo = Boolean(forceDirect);
+  }
+
+  isBarrelEffectivelyActive() {
+    return this.barrelDistortionEnabled && !this.forceDirectStereo;
+  }
+
   setIpdMeters(ipdMeters) {
     this.ipdMeters = THREE.MathUtils.clamp(ipdMeters, 0.050, 0.080);
     this.updateEyeOptics();
@@ -379,7 +388,7 @@ export class StereoRenderer {
       return;
     }
 
-    if (this.barrelDistortionEnabled && this.leftTarget && this.rightTarget) {
+    if (this.isBarrelEffectivelyActive() && this.leftTarget && this.rightTarget) {
       // Pass 1: Render Left Eye (with live camera passthrough if enabled) to offscreen target
       this.renderer.setScissorTest(false);
       this.renderer.setRenderTarget(this.leftTarget);

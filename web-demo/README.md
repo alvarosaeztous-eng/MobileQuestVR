@@ -1,4 +1,4 @@
-# MobileQuestVR Web (Fase 2)
+# MobileQuestVR Web (Fase 2 + Cine YouTube 3D en VR)
 
 Versión web 3D de **MobileQuestVR** optimizada para **Google Chrome en Android**, ejecutable directamente desde un enlace **HTTPS** (como GitHub Pages) sin instalar Unity ni usar un ordenador.
 
@@ -6,47 +6,35 @@ Versión web 3D de **MobileQuestVR** optimizada para **Google Chrome en Android*
 
 ---
 
-## Funcionalidades implementadas (Fase 1 + Fase 2)
+## Funcionalidades implementadas
 
-### 1. Seguimiento real de manos con MediaPipe Tasks Vision (`js/handTracking.js`, `js/cameraManager.js`)
-- Integra **`@mediapipe/tasks-vision@1.2.3`** (`HandLandmarker`) usando la **cámara real del móvil** mediante `navigator.mediaDevices.getUserMedia`.
-- **Nunca simula detección de manos**: si no hay permiso de cámara, no se abre bajo HTTPS o falla la descarga del runtime/modelo de MediaPipe, muestra el motivo real al usuario y mantiene el modo desactivado.
-- Dibuja los **21 puntos clave (landmarks) y conexiones óseas** de hasta 2 manos:
-  - Como **esqueleto 3D interactivo + rayo láser** frente al usuario en Modo Normal y Modo VR Estereoscópico (con suavizado filtro One-Euro).
-  - En una **vista previa 2D en vivo** en Modo Normal para verificar fácilmente el encuadre de la mano.
-- **Gestos básicos reales** (`classifyHandGesture`, invariantes a la escala de la mano):
-  - **Pinza (`pinch`)** (pulgar + índice): selecciona botones 3D, iconos del menú de apps o agarra/suelta objetos 3D.
-  - **Puño cerrado (`fist`)**: agarra el objeto 3D apuntado con el rayo de la mano y lo suelta al abrirla.
-  - **Mano abierta (`open_palm`, ~1 segundo)**: invoca el menú flotante 3D de Inicio / Aplicaciones frente a ti.
-- Descarga el runtime WASM v1.2.3 (`jsdelivr` con respaldo `unpkg`) y el modelo oficial `hand_landmarker.task`, intentando primero aceleración **GPU** y cambiando automáticamente a **CPU** si la GPU móvil no soporta el delegado WebGL2.
+### 1. Pantalla flotante 3D de YouTube dentro del entorno VR (`js/youtubeScreen.js`)
+- **Reproductor oficial real de YouTube**: utiliza la **YouTube IFrame Player API** (`https://www.youtube.com/iframe_api`) configurada con el dominio oficial de privacidad **`https://www.youtube-nocookie.com`** (`autoplay: 0`, `playsinline: 1`, `enablejsapi: 1`). Nunca simula ni finge reproducción.
+- **Superficie 3D real visible en ambos ojos en Modo Estereoscópico**:
+  - Proyección **CSS3D matemática exacta** (`WORLD_TO_CSS = 500`, sincronizada al subpíxel con las matrices de `PerspectiveCamera` de Three.js) acoplada a un **marco de cine 3D WebGL** con respaldo opaco, cabecera holográfica de estado y barra inferior de botones 3D interactivos.
+  - En **Modo Normal (Mono)**: usa una sola vista CSS3D ligada a `monoCamera`.
+  - En **Modo VR Estereoscópico**: activa dos vistas CSS3D recortadas izquierda/derecha (`leftCamera` y `rightCamera` con offset IPD real) con dos instancias sincronizadas del reproductor oficial (ojo izquierdo con audio y ojo derecho silenciado `mute: 1` con sincronización automática de tiempo/pausa para evitar eco).
+  - Al abrir YouTube 3D en Modo VR, cambia automáticamente a **Stereo Directo** (proyección plana) para que el marco WebGL y el iframe CSS3D coincidan píxel a píxel en ambos ojos, y restaura automáticamente la distorsión barrel al cerrar YouTube.
+- **Selector de URL y vídeos de prueba**:
+  - Permite pegar cualquier enlace de YouTube (`youtube.com/watch?v=...`, `m.youtube.com/watch?v=...`, `youtu.be/...`, `shorts/...`, `live/...`, `embed/...`, `youtube-nocookie.com/embed/...`) o un ID de 11 caracteres, además de elegir vídeos de prueba con incrustación habilitada.
+- **Controles completos (en 3D dentro de VR y en HUD móvil)**:
+  - **Reproducir** (siempre manual — nunca depende de autoplay), **Pausar**, **Cambiar tamaño (`S` `1.36×0.765 m`, `M` `1.92×1.08 m`, `L` `2.56×1.44 m`)**, **Cambiar URL / Vídeo**, **Traer aquí** y **Cerrar**.
+- **Detección honesta de vídeos con incrustación bloqueada**:
+  - Detecta los errores reales de la API de YouTube (como códigos **`101` / `150`** cuando el propietario desactiva la reproducción incrustada, o `100` / `2` / `5`), muestra un aviso claro dentro de la experiencia y ofrece un botón de 1 toque para **abrir el vídeo en YouTube externo**.
 
-### 2. Modo cámara real / Passthrough (`js/cameraManager.js`, `js/stereoRenderer.js`, `js/room.js`)
-- Muestra la **imagen real de la cámara del móvil** como fondo en directo con recorte proporcional (`object-fit: cover` sin deformación).
-- Superpone los **elementos 3D, mesa holográfica translúcida, manos 3D, menú de apps y panel de ajustes** sobre el vídeo real tanto en **Modo Normal** como en **Modo VR Estereoscópico** (con y sin distorsión barrel).
-- Comparte un único flujo de cámara (`CameraManager` con conteo de referencias) para que **Passthrough** y **Seguimiento de manos** puedan funcionar **simultáneamente** en Android Chrome sin conflictos de cámara.
-- Permite alternar entre **cámara trasera y frontal** (`Trasera / Frontal`) y entre **Passthrough** y **Sala Virtual 3D** en cualquier momento.
-- **Comprobación de lente tapada**: analiza la luminancia del vídeo en vivo y avisa si las gafas VR están cubriendo físicamente la lente trasera del teléfono. Nunca afirma que Passthrough funciona si la cámara no está activa.
+### 2. Seguimiento real de manos con MediaPipe Tasks Vision (`js/handTracking.js`, `js/cameraManager.js`)
+- Integra **`@mediapipe/tasks-vision@1.2.3`** (`HandLandmarker`) usando la **cámara real del móvil** (`navigator.mediaDevices.getUserMedia`), sin simulaciones.
+- Dibuja los **21 puntos clave (landmarks) y conexiones óseas** de hasta 2 manos como esqueleto 3D interactivo + rayo láser (con filtro One-Euro) y vista previa 2D en Modo Normal.
+- **Gestos reales**: **Pinza (`pinch`)** para seleccionar botones/apps/controles 3D de YouTube o agarrar objetos, **Puño (`fist`)** para agarrar objetos 3D, y **Mano abierta (`open_palm`, ~1 s)** para abrir el Menú de Inicio.
+- Descarga runtime WASM v1.2.3 (`jsdelivr` / respaldo `unpkg`) y modelo oficial `hand_landmarker.task` con respaldo automático `GPU` → `CPU`.
 
-### 3. Menú flotante 3D de aplicaciones (`js/appsMenu.js`)
-- Dock flotante 3D al estilo Meta Quest invocable desde el botón **Inicio** o manteniendo la **mano abierta (~1 s)**, con 5 iconos interactivos 3D:
-  - **Chrome** → abre enlace externo real (`https://www.google.com/chrome/`).
-  - **YouTube** → abre enlace externo real (`https://m.youtube.com/`, que Android puede abrir en la app de YouTube o en el navegador).
-  - **Google** → abre enlace externo real (`https://www.google.com/`).
-  - **Ajustes** → abre el panel flotante 3D de configuración VR frente a ti.
-  - **Volver a MobileQuestVR** → cierra el lanzador y vuelve el enfoque a tu entorno VR/Passthrough.
-- **Comportamiento honesto**: las aplicaciones externas se abren únicamente como enlaces externos en una nueva pestaña / app compatible de Android. Si Chrome bloquea la apertura automática (habitual cuando se activa mediante mirada o gesto de mano en lugar de toque directo), aparece una barra con un botón de 1 toque (`Abrir ↗`) para abrir el enlace sin errores. Nunca incrusta apps privadas en `iframe` ni finge ejecutarlas dentro del visor.
+### 3. Modo cámara real / Passthrough (`js/cameraManager.js`, `js/stereoRenderer.js`, `js/room.js`)
+- Muestra la cámara real del móvil como fondo proporcional (`object-fit: cover`) con objetos 3D, pantalla YouTube 3D, menús y manos superpuestos en Modo Normal y Modo VR.
+- Comparte una sola cámara entre **Passthrough** y **Manos MediaPipe** sin conflictos, permite alternar **Trasera / Frontal** y detecta si las gafas VR están tapando físicamente la lente trasera.
 
-### 4. Interfaz cómoda estilo Meta Quest + Funcionalidades conservadas de Fase 1
-- **HUD rápido en Modo Normal y barra compacta en Modo VR**:
-  - **Inicio** (menú flotante 3D de aplicaciones).
-  - **Modo VR / Modo Normal** (pantalla completa, bloqueo horizontal, Wake Lock y vista estereoscópica).
-  - **Passthrough / Sala 3D** (cámara real vs habitación virtual).
-  - **Manos: ON / OFF** (MediaPipe real).
-  - **Cabeza: ON / OFF** (activa o pausa el seguimiento 3DoF por giroscopio conservando el ángulo actual).
-  - **Recentrar** (reorienta el horizonte).
-  - **Ajustes 3D** (panel holográfico con IPD `50–80 mm`, Lente Barrel ON/OFF, 3 ambientes de luz, Reiniciar objetos, Cámara Trasera/Frontal y Anclar/Seguir).
-  - **Interactuar** + controles **Acercar / Soltar / Alejar** para objetos 3D físicos.
-- Se conservan íntegros la habitación virtual 3D futurista, la física de agarre y lanzamiento, el holograma interactivo, el pad de audio Web Audio API, la telemetría mural 3D en vivo y la distorsión óptica Brown-Conrady.
+### 4. Menú flotante 3D de aplicaciones e interfaz estilo Meta Quest (`js/appsMenu.js`, `js/floatingMenu.js`, `js/main.js`)
+- Menú 3D **Inicio** con 5 iconos: **YouTube** (abre la pantalla flotante 3D de Cine VR dentro del entorno), **Chrome** (enlace externo), **Google** (enlace externo), **Ajustes** (panel 3D de configuración VR) y **Volver a MobileQuestVR**.
+- HUD rápido con **Inicio**, **YouTube 3D**, **Modo VR / Normal**, **Passthrough / Sala 3D**, **Manos ON/OFF**, **Cabeza ON/OFF**, **Recentrar**, **Ajustes 3D** e **Interactuar**, conservando íntegras la habitación 3D futurista, física de agarre/lanzamiento, ajuste de IPD `50–80 mm`, lente barrel, 3 ambientes de luz, audio Web Audio API y telemetría mural 3D.
 
 ---
 
@@ -58,25 +46,34 @@ Versión web 3D de **MobileQuestVR** optimizada para **Google Chrome en Android*
    ```text
    https://alvarosaeztous-eng.github.io/MobileQuestVR/web-demo/
    ```
-4. Concede los permisos cuando Chrome los solicite:
-   - **Sensores de movimiento / giroscopio**: al pulsar **Modo VR** o activar **Cabeza: ON**.
-   - **Cámara**: al pulsar **Passthrough** o **Manos: ON**.
+4. Para usar **YouTube 3D**:
+   - Pulsa **YouTube 3D** en la barra inferior o abre **Inicio** → icono **YouTube**.
+   - Pulsa **▶ Reproducir** manualmente (en los controles 3D bajo la pantalla, en la barra del HUD o directamente sobre el botón rojo del reproductor YouTube).
+   - Pulsa **🔗 Cambiar URL** para pegar cualquier enlace de YouTube o elegir un vídeo de prueba.
 
 ---
 
-## Limitaciones reales actuales (hardware y navegador)
+## Compatibilidad con Android Chrome y limitaciones reales
 
-- **HTTPS obligatorio**: Chrome Android bloquea `getUserMedia` (cámara) y los sensores `DeviceOrientation` si la página se abre en `http://` (salvo `localhost`).
-- **Gafas VR con tapa cerrada**: muchos visores VR económicos de plástico o cartón cubren la cámara trasera del móvil. Si la lente está tapada, ni Passthrough ni el seguimiento de manos con cámara trasera podrán ver el entorno (el visor avisará automáticamente). Necesitarás una tapa frontal abierta/recortada o probar primero fuera del visor / con cámara frontal.
-- **Descarga inicial de MediaPipe**: el módulo JS `@mediapipe/tasks-vision@1.2.3` está incluido localmente en `vendor/mediapipe/`, pero el runtime WebAssembly (~10 MB) y el modelo neuronal `hand_landmarker.task` (~7.5 MB) se descargan de los servidores oficiales de MediaPipe/CDN la primera vez que activas **Manos: ON** (requiere conexión a Internet en esa primera carga).
-- **Profundidad monocular en manos**: al usar una sola cámara del teléfono (sin sensores de profundidad LiDAR/estéreo dedicados), la distancia Z de la mano se estima a partir del tamaño aparente de la palma, por lo que la precisión en profundidad es menor que en un visor Meta Quest nativo.
-- **Seguimiento de cabeza 3DoF**: en navegador móvil se dispone de rotación 3DoF (giroscopio/orientación), no de traslación posicional 6DoF en la habitación.
-- **Aplicaciones externas**: por seguridad del navegador y de Android, una web no puede ejecutar apps nativas ni mostrar servicios como YouTube/Google dentro de ventanas internas privadas; los iconos abren enlaces reales externos.
+### Limitaciones de YouTube y del navegador (Cine 3D VR)
+- **Seguridad cross-origin (`CORS`)**: los navegadores prohíben leer píxeles de un `<iframe>` oficial de YouTube para convertirlos en textura WebGL (`VideoTexture`). Por eso se usa una capa **CSS3D sincronizada** sobre el marco WebGL 3D.
+- **Sin distorsión barrel sobre el iframe**: los shaders WebGL de distorsión barrel Brown-Conrady no pueden deformar elementos DOM `<iframe>`. Para mantener la alineación exacta entre el marco 3D y el vídeo en ambos ojos, el Modo VR usa automáticamente **Stereo Directo** mientras la pantalla de YouTube 3D está abierta y restaura la lente barrel al cerrarla.
+- **Doble flujo en Modo Estereoscópico**: mostrar el reproductor oficial de YouTube en ambos ojos requiere dos instancias sincronizadas de `youtube-nocookie.com` (ojo izquierdo con audio, ojo derecho silenciado). Esto consume mayor ancho de banda/CPU en móviles y puede producir breves desfases (~0,2–0,4 s) al cambiar de minuto o durante buffering (el sistema resincroniza automáticamente cada ~1,2 s).
+- **Vídeos con incrustación bloqueada (`101` / `150`)**: muchos vídeos musicales, transmisiones o canales desactivan la reproducción incrustada o aplican restricciones de edad/DRM. Ninguna web puede saltarse esa política de YouTube; la app detecta el error real y ofrece un botón directo para abrir el vídeo en YouTube externo.
+- **Política de reproducción manual en Android Chrome**: Chrome bloquea la reproducción automática con sonido sin interacción directa del usuario; por ello la reproducción siempre es manual (`autoplay: 0`).
+- **Interacción táctil sobre el iframe**: los toques dentro del rectángulo del vídeo van al reproductor oficial de YouTube (permitiendo pulsar ▶, pausar o ajustar calidad), mientras que arrastrar fuera del vídeo mueve la cámara y mirar/hacer pinza sobre la barra 3D inferior activa los controles VR (`Reproducir`, `Pausar`, `Tamaño`, `URL`, `Traer`, `Cerrar`).
+
+### Limitaciones generales de hardware móvil y navegador
+- **HTTPS obligatorio**: Chrome Android requiere HTTPS para cámara (`getUserMedia`) y giroscopio (`DeviceOrientation`).
+- **Gafas VR cerradas**: si la tapa frontal cubre la cámara trasera, Passthrough y Manos con cámara trasera no podrán ver el entorno (la app avisa automáticamente).
+- **Primera carga con Internet**: el módulo JS `@mediapipe/tasks-vision@1.2.3` está incluido localmente, pero el runtime WASM (~10 MB), `hand_landmarker.task` (~7,5 MB) y `youtube.com/iframe_api` se descargan desde sus servidores oficiales al activarse.
+- **Seguimiento 3DoF y profundidad monocular**: el navegador móvil ofrece rotación 3DoF (sin traslación 6DoF) y estimación monocular de profundidad para las manos.
 
 ---
 
 ## Dependencias incluidas
 
-- **Three.js r170** incluido localmente en `vendor/three/three.module.min.js` (licencia MIT).
-- **`@mediapipe/tasks-vision@1.2.3`** incluido localmente en `vendor/mediapipe/vision_bundle.mjs` (licencia Apache-2.0), con carga en tiempo de ejecución del runtime WASM v1.2.3 y modelo oficial `hand_landmarker.task`.
+- **Three.js r170** incluido localmente en `vendor/three/three.module.min.js` (MIT).
+- **`@mediapipe/tasks-vision@1.2.3`** incluido localmente en `vendor/mediapipe/vision_bundle.mjs` (Apache-2.0).
+- **YouTube IFrame Player API** (`https://www.youtube.com/iframe_api` + `https://www.youtube-nocookie.com`) cargada bajo demanda únicamente al abrir la pantalla 3D de YouTube.
 - **Sin paso de compilación**: HTML5, CSS3 y módulos ES nativos listos para GitHub Pages.
