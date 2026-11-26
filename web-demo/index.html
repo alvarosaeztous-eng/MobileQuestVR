@@ -7,38 +7,67 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>MobileQuestVR Web — Realidad Virtual 3D para Android</title>
+  <title>MobileQuestVR Web — Realidad Virtual y Mixta para Android</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="stylesheet" href="./css/styles.css" />
 </head>
 <body>
-  <!-- Contenedor WebGL principal -->
-  <div id="vr-viewport" aria-label="Escena 3D de Realidad Virtual">
+  <!-- Contenedor WebGL principal (incluye escena 3D y fondo Passthrough de cámara real) -->
+  <div id="vr-viewport" aria-label="Escena 3D de Realidad Virtual y Mixta">
     <canvas id="vr-canvas"></canvas>
   </div>
 
   <!-- Aviso automático si no se abre bajo HTTPS (requerido por Chrome Android para sensores/cámara) -->
   <div id="https-warning" class="banner-warning hidden" role="alert">
-    <span>⚠ Para giroscopio y cámara en Android Chrome abre esta app mediante <strong>HTTPS</strong> (ej. GitHub Pages).</span>
+    <span>⚠ Para giroscopio, seguimiento de manos y Passthrough en Android Chrome abre esta app mediante <strong>HTTPS</strong> (ej. GitHub Pages).</span>
     <button id="btn-dismiss-https" type="button" aria-label="Cerrar aviso">✕</button>
   </div>
 
-  <!-- HUD táctil optimizado para Android (modo normal / Mono) -->
+  <!-- Alerta real de cámara / permisos / gafas VR tapando la lente -->
+  <div id="camera-alert" class="banner-alert hidden" role="alert" aria-live="polite">
+    <span id="camera-alert-text">Estado de cámara</span>
+    <button id="btn-dismiss-camera-alert" type="button" aria-label="Cerrar alerta">✕</button>
+  </div>
+
+  <!-- Barra de apertura externa (fallback honesto si Chrome bloquea ventanas emergentes por mirada/gesto) -->
+  <div id="external-link-bar" class="external-link-bar hidden" role="region" aria-live="polite">
+    <div class="external-link-info">
+      <strong id="external-link-title">Enlace externo</strong>
+      <span id="external-link-note">Se abrirá en una nueva pestaña o app compatible de Android</span>
+    </div>
+    <div class="external-link-actions">
+      <a id="external-link-anchor" class="btn-chip btn-accent" href="https://www.google.com/" target="_blank" rel="noopener noreferrer">Abrir ↗</a>
+      <button id="btn-close-external-link" class="btn-chip" type="button" aria-label="Cerrar">✕</button>
+    </div>
+  </div>
+
+  <!-- HUD táctil optimizado para Android (Modo Normal / Mono) -->
   <div id="hud-mono" class="hud-layer">
     <header class="hud-topbar">
       <div class="brand-group">
         <span class="brand-dot" aria-hidden="true"></span>
         <div>
-          <h1 class="brand-title">MobileQuestVR <span class="brand-tag">WEB</span></h1>
-          <p id="status-subtitle" class="brand-sub">Cargando habitación 3D…</p>
+          <h1 class="brand-title">MobileQuestVR <span class="brand-tag">FASE 2</span></h1>
+          <p id="status-subtitle" class="brand-sub">Cargando entorno 3D…</p>
         </div>
       </div>
 
       <div class="telemetry-pills">
+        <span id="pill-passthrough" class="pill pill-muted">Sala 3D</span>
+        <span id="pill-hands" class="pill pill-muted">Manos: OFF</span>
         <span id="pill-sensor" class="pill pill-muted">Táctil</span>
         <span id="pill-fps" class="pill">-- FPS</span>
       </div>
     </header>
+
+    <!-- Vista previa 2D en vivo de puntos y conexiones de MediaPipe (solo en Modo Normal con Manos ON) -->
+    <aside id="hand-pip-card" class="hand-pip-card hidden" aria-label="Seguimiento real de manos MediaPipe">
+      <div class="hand-pip-header">
+        <span id="hand-pip-gesture">Gesto: —</span>
+        <button id="btn-flip-camera-pip" class="btn-pip-flip" type="button" title="Cambiar cámara trasera / frontal">⇄ Cám.</button>
+      </div>
+      <canvas id="hand-pip-canvas" width="224" height="140"></canvas>
+    </aside>
 
     <!-- Indicador contextual del objeto apuntado -->
     <div id="target-toast" class="target-toast hidden" aria-live="polite">
@@ -52,12 +81,32 @@
       <button id="btn-grab-far" class="btn-chip" type="button">+ Alejar</button>
     </div>
 
-    <!-- Barra inferior ergonómica para pulgares en Android -->
+    <!-- Barra inferior ergonómica tipo Meta Quest para Android -->
     <footer class="hud-bottombar">
       <div class="control-row">
-        <button id="btn-vr-mode" class="btn-primary" type="button">
+        <button id="btn-home" class="btn-secondary" type="button" title="Abrir menú flotante de aplicaciones (H)">
+          <span class="btn-icon" aria-hidden="true">⌂</span>
+          <span>Inicio</span>
+        </button>
+
+        <button id="btn-vr-mode" class="btn-primary" type="button" title="Cambiar entre Modo VR y Modo Normal (V)">
           <span class="btn-icon" aria-hidden="true">🕶</span>
-          <span>Modo VR</span>
+          <span id="btn-vr-mode-text">Modo VR</span>
+        </button>
+
+        <button id="btn-passthrough" class="btn-secondary" type="button" title="Alternar cámara real Passthrough y Sala 3D (P)">
+          <span class="btn-icon" aria-hidden="true">📷</span>
+          <span id="btn-passthrough-text">Passthrough</span>
+        </button>
+
+        <button id="btn-hands" class="btn-secondary" type="button" title="Activar seguimiento real de manos con cámara">
+          <span class="btn-icon" aria-hidden="true">✋</span>
+          <span id="btn-hands-text">Manos: OFF</span>
+        </button>
+
+        <button id="btn-head" class="btn-secondary" type="button" title="Activar o desactivar seguimiento de cabeza">
+          <span class="btn-icon" aria-hidden="true">↻</span>
+          <span id="btn-head-text">Cabeza: ON</span>
         </button>
 
         <button id="btn-recenter" class="btn-secondary" type="button" title="Recentrar vista (R)">
@@ -65,37 +114,40 @@
           <span>Recentrar</span>
         </button>
 
+        <button id="btn-summon-menu" class="btn-secondary" type="button" title="Traer panel de ajustes 3D al frente (M)">
+          <span class="btn-icon" aria-hidden="true">⚙</span>
+          <span>Ajustes 3D</span>
+        </button>
+
         <button id="btn-action" class="btn-secondary" type="button" title="Seleccionar / Agarrar objeto">
           <span class="btn-icon" aria-hidden="true">✦</span>
           <span id="btn-action-text">Interactuar</span>
         </button>
 
-        <button id="btn-summon-menu" class="btn-secondary" type="button" title="Traer menú 3D al frente (M)">
-          <span class="btn-icon" aria-hidden="true">☰</span>
-          <span>Menú 3D</span>
-        </button>
-
-        <button id="btn-sensor" class="btn-secondary" type="button" title="Activar giroscopio">
-          <span class="btn-icon" aria-hidden="true">↻</span>
-          <span id="btn-sensor-text">Giroscopio</span>
+        <button id="btn-flip-camera" class="btn-secondary hidden" type="button" title="Cambiar entre cámara trasera y frontal">
+          <span class="btn-icon" aria-hidden="true">⇄</span>
+          <span id="btn-flip-camera-text">Trasera</span>
         </button>
       </div>
 
       <p id="touch-hint" class="touch-hint">
-        Arrastra para mirar • Apunta con la retícula (1.1s) o pulsa <strong>Interactuar</strong> para agarrar/activar objetos y botones 3D
+        Arrastra para mirar • <strong>Inicio</strong> abre apps 3D • <strong>Manos</strong> activa MediaPipe real (Pinza / Puño / Mano abierta) • <strong>Passthrough</strong> muestra la cámara real
       </p>
     </footer>
   </div>
 
-  <!-- Controles minimalistas centrados sobre el divisor en modo estereoscópico VR -->
+  <!-- Controles minimalistas centrados sobre el divisor en Modo VR Estereoscópico -->
   <div id="hud-stereo" class="hud-stereo hidden">
     <div class="stereo-divider" aria-hidden="true"></div>
     <div class="stereo-top-controls">
-      <button id="btn-exit-vr" class="btn-vr-mini" type="button">✕ Salir VR</button>
+      <button id="btn-exit-vr" class="btn-vr-mini" type="button">✕ Normal</button>
+      <button id="btn-home-vr" class="btn-vr-mini" type="button">⌂ Inicio</button>
       <button id="btn-recenter-vr" class="btn-vr-mini" type="button">◎ Recentrar</button>
+      <button id="btn-passthrough-vr" class="btn-vr-mini" type="button">📷 Passth.</button>
+      <button id="btn-hands-vr" class="btn-vr-mini" type="button">✋ Manos</button>
     </div>
     <div class="stereo-bottom-hint">
-      <span>Toca la pantalla para seleccionar / soltar • Mira los botones del menú 3D</span>
+      <span>Toca o haz pinza para seleccionar/agarrar • Mano abierta (1s) abre Inicio • Mira el panel 3D</span>
     </div>
   </div>
 

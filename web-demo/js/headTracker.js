@@ -14,6 +14,7 @@ export class HeadTracker {
     this.rig = stereoRig;
     this.canvas = canvas;
 
+    this.headTrackingEnabled = true;
     this.sensorEnabled = false;
     this.sensorActive = false;
     this.sensorStatusLabel = 'Modo táctil';
@@ -119,8 +120,35 @@ export class HeadTracker {
     }
   }
 
+  async setHeadTrackingEnabled(enabled) {
+    const next = Boolean(enabled);
+    if (next === this.headTrackingEnabled) return this.headTrackingEnabled;
+
+    if (!next) {
+      // Preserve current facing angle so turning Head Tracking OFF never snaps the view
+      this._eulerTemp.setFromQuaternion(this._filteredQuat, 'YXZ');
+      this.manualPitch = THREE.MathUtils.clamp(this._eulerTemp.x, -1.42, 1.42);
+      this.manualYaw = this._eulerTemp.y;
+      this.headTrackingEnabled = false;
+      this.disableGyroscope();
+      this.sensorStatusLabel = 'Cabeza OFF (Táctil)';
+      return false;
+    }
+
+    this.headTrackingEnabled = true;
+    await this.enableGyroscope();
+    if (!this.sensorActive) {
+      this.sensorStatusLabel = 'Esperando giroscopio...';
+    }
+    return true;
+  }
+
+  async toggleHeadTracking() {
+    return this.setHeadTrackingEnabled(!this.headTrackingEnabled);
+  }
+
   recenter() {
-    if (this.sensorActive && this._hasFirstSensorSample) {
+    if (this.headTrackingEnabled && this.sensorActive && this._hasFirstSensorSample) {
       this._yawRecenterOffset.copy(this._computeYawRecenterQuaternion(this._rawSensorQuat));
       this._targetQuat.copy(this._yawRecenterOffset).multiply(this._rawSensorQuat);
       this._filteredQuat.copy(this._targetQuat);
@@ -135,7 +163,7 @@ export class HeadTracker {
   update(dt) {
     const safeDt = Math.min(Math.max(dt, 0.001), 0.1);
 
-    if (this.sensorActive && this._hasFirstSensorSample) {
+    if (this.headTrackingEnabled && this.sensorActive && this._hasFirstSensorSample) {
       this._targetQuat.copy(this._yawRecenterOffset).multiply(this._rawSensorQuat);
 
       // Velocity-adaptive SLERP: rock-steady when still, snappy when turning head quickly
@@ -161,6 +189,7 @@ export class HeadTracker {
   }
 
   _handleDeviceOrientation(event) {
+    if (!this.headTrackingEnabled) return;
     if (event.alpha === null || event.beta === null || event.gamma === null) {
       return;
     }
