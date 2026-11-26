@@ -1,0 +1,10 @@
+{
+  "name": "MobileQuestVR Web",
+  "short_name": "MobileQuestVR",
+  "description": "Realidad Virtual 3D estereoscópica para Android Chrome con Three.js, giroscopio y objetos interactivos.",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#050914",
+  "theme_color": "#081224"
+}
