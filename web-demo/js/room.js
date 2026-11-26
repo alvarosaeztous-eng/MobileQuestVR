@@ -73,10 +73,17 @@ export class VirtualRoom {
     this.root.name = 'VirtualRoom';
     this.scene.add(this.root);
 
+    // Separate environment shell group so Passthrough mode can hide opaque room walls
+    // while keeping floating interactive objects and hologram props overlaid over real camera video
+    this.environmentGroup = new THREE.Group();
+    this.environmentGroup.name = 'RoomEnvironmentShell';
+    this.root.add(this.environmentGroup);
+
     this.interactables = [];
     this.grabbables = [];
     this.accentMaterials = [];
 
+    this.passthroughMode = false;
     this.currentPresetIndex = 0;
     this.hologramTurbo = false;
     this._chimePulse = 0;
@@ -110,8 +117,10 @@ export class VirtualRoom {
     this.currentPresetIndex = index % LIGHTING_PRESETS.length;
     const p = this.currentPreset;
 
-    this.scene.background = new THREE.Color(p.bgHex);
-    this.scene.fog = new THREE.FogExp2(p.fogHex, 0.048);
+    if (!this.passthroughMode) {
+      this.scene.background = new THREE.Color(p.bgHex);
+      this.scene.fog = new THREE.FogExp2(p.fogHex, 0.048);
+    }
 
     this.hemiLight.color.setHex(p.hemiSky);
     this.hemiLight.groundColor.setHex(p.hemiGround);
@@ -132,6 +141,33 @@ export class VirtualRoom {
 
     if (this._vistaSkyCanvas) {
       this._redrawVistaBackdrop(p.windowTop, p.windowBottom);
+    }
+  }
+
+  /**
+   * Switches between the full futuristic 3D Virtual Room and Mixed Reality Passthrough overlay
+   * (hiding opaque walls/floor/ceiling while keeping a sleek translucent holo-tray under the 3D objects).
+   */
+  setPassthroughMode(enabled) {
+    this.passthroughMode = Boolean(enabled);
+    this.environmentGroup.visible = !this.passthroughMode;
+
+    if (this._deskTopMat) {
+      this._deskTopMat.transparent = this.passthroughMode;
+      this._deskTopMat.opacity = this.passthroughMode ? 0.34 : 1.0;
+      this._deskTopMat.needsUpdate = true;
+    }
+    if (this._deskLegsGroup) {
+      this._deskLegsGroup.visible = !this.passthroughMode;
+    }
+
+    if (this.passthroughMode) {
+      this.scene.background = null;
+      this.scene.fog = null;
+    } else {
+      const p = this.currentPreset;
+      this.scene.background = new THREE.Color(p.bgHex);
+      this.scene.fog = new THREE.FogExp2(p.fogHex, 0.048);
     }
   }
 
@@ -317,32 +353,32 @@ export class VirtualRoom {
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(this.roomWidth, this.roomDepth), floorMat);
     floor.rotation.x = -Math.PI * 0.5;
     floor.receiveShadow = true;
-    this.root.add(floor);
+    this.environmentGroup.add(floor);
 
     // Ceiling
     const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(this.roomWidth, this.roomDepth), ceilingMat);
     ceiling.rotation.x = Math.PI * 0.5;
     ceiling.position.y = this.roomHeight;
-    this.root.add(ceiling);
+    this.environmentGroup.add(ceiling);
 
     // Back, Left, Right full walls
     const backWall = new THREE.Mesh(new THREE.PlaneGeometry(this.roomWidth, this.roomHeight), wallMat);
     backWall.position.set(0, halfH, halfD);
     backWall.rotation.y = Math.PI;
     backWall.receiveShadow = true;
-    this.root.add(backWall);
+    this.environmentGroup.add(backWall);
 
     const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(this.roomDepth, this.roomHeight), wallMat);
     leftWall.position.set(-halfW, halfH, 0);
     leftWall.rotation.y = Math.PI * 0.5;
     leftWall.receiveShadow = true;
-    this.root.add(leftWall);
+    this.environmentGroup.add(leftWall);
 
     const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(this.roomDepth, this.roomHeight), wallMat);
     rightWall.position.set(halfW, halfH, 0);
     rightWall.rotation.y = -Math.PI * 0.5;
     rightWall.receiveShadow = true;
-    this.root.add(rightWall);
+    this.environmentGroup.add(rightWall);
 
     // Front wall built around panoramic viewport opening (x in [-1.85, 1.85], y in [1.05, 2.75])
     const frontMat = wallMat;
@@ -362,7 +398,7 @@ export class VirtualRoom {
     const skyPanelMat = this._createAccentMaterial(0.85);
     const skyPanel = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.04, 1.9), skyPanelMat);
     skyPanel.position.set(0, this.roomHeight - 0.02, -0.45);
-    this.root.add(skyPanel);
+    this.environmentGroup.add(skyPanel);
   }
 
   _buildPanoramicVista() {
@@ -380,7 +416,7 @@ export class VirtualRoom {
       new THREE.MeshBasicMaterial({ map: this._vistaSkyTex })
     );
     vistaPlane.position.set(0, 2.2, -10.5);
-    this.root.add(vistaPlane);
+    this.environmentGroup.add(vistaPlane);
 
     // Drifting 3D starfield outside the window (creates true binocular stereo depth!)
     const starCount = 260;
@@ -399,7 +435,7 @@ export class VirtualRoom {
       opacity: 0.85,
     });
     this._starPoints = new THREE.Points(starGeo, starMat);
-    this.root.add(this._starPoints);
+    this.environmentGroup.add(this._starPoints);
 
     // Subtle futuristic outer orbital skyline ring visible through window
     const horizonRing = new THREE.Mesh(
@@ -408,7 +444,7 @@ export class VirtualRoom {
     );
     horizonRing.position.set(0, 1.35, -7.8);
     horizonRing.rotation.x = Math.PI * 0.44;
-    this.root.add(horizonRing);
+    this.environmentGroup.add(horizonRing);
 
     // Window mullion frame
     const frameMat = new THREE.MeshStandardMaterial({ color: 0x0c1320, roughness: 0.35, metalness: 0.7 });
@@ -465,12 +501,12 @@ export class VirtualRoom {
     );
     matBase.position.set(0, 0.007, -0.75);
     matBase.receiveShadow = true;
-    this.root.add(matBase);
+    this.environmentGroup.add(matBase);
 
     // Right wall futuristic display shelf with decorative stereo artifacts
     const shelfGroup = new THREE.Group();
     shelfGroup.position.set(this.roomWidth * 0.5 - 0.24, 0, -0.35);
-    this.root.add(shelfGroup);
+    this.environmentGroup.add(shelfGroup);
 
     for (let level = 0; level < 4; level++) {
       const board = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.04, 1.55), woodAccentMat);
@@ -501,6 +537,7 @@ export class VirtualRoom {
     this.root.add(deskGroup);
 
     const topMat = new THREE.MeshStandardMaterial({ color: 0x162235, roughness: 0.34, metalness: 0.52 });
+    this._deskTopMat = topMat;
     const legMat = new THREE.MeshStandardMaterial({ color: 0x0b111d, roughness: 0.4, metalness: 0.72 });
     const edgeGlow = this._createAccentMaterial(1.6);
 
@@ -520,13 +557,15 @@ export class VirtualRoom {
     deskGroup.add(frontEdge);
 
     // Sleek angled side pedestals
+    this._deskLegsGroup = new THREE.Group();
+    deskGroup.add(this._deskLegsGroup);
     const legH = this.deskTopY - thick;
     for (const side of [-1, 1]) {
       const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, legH, d - 0.14), legMat);
       leg.position.set(side * (this.deskHalfW - 0.14), legH * 0.5, 0);
       leg.castShadow = true;
       leg.receiveShadow = true;
-      deskGroup.add(leg);
+      this._deskLegsGroup.add(leg);
     }
   }
 
@@ -755,7 +794,7 @@ export class VirtualRoom {
     mesh.position.set(x, y, z);
     mesh.castShadow = castShadow;
     mesh.receiveShadow = true;
-    this.root.add(mesh);
+    this.environmentGroup.add(mesh);
     return mesh;
   }
 

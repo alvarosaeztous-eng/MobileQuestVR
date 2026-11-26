@@ -1,8 +1,13 @@
+export { CameraManager } from './cameraManager.js';
+export {
+  MediaPipeHandTracker,
+  HAND_CONNECTIONS,
+  classifyHandGesture,
+} from './handTracking.js';
+
 /**
- * Phase 2 MediaPipe Tasks Vision integration contract.
- * Detects real browser camera & secure-context capabilities without simulating or faking tracking.
- * When Phase 2 (@mediapipe/tasks-vision HandLandmarker) is added, it registers its live hand provider
- * through bindProvider() and forwards 3D pinch rays directly to VRInteractionController.
+ * Bridge connecting the active real hand-tracking provider (MediaPipeHandTracker)
+ * to VRInteractionController without ever simulating or faking hand detection.
  */
 export class HandTrackingBridge {
   constructor() {
@@ -16,21 +21,25 @@ export class HandTrackingBridge {
       return this.provider.getStatusText();
     }
     if (!this.isSecureOrigin) {
-      return 'Pendiente Fase 2 (requiere HTTPS para cámara)';
+      return 'Cámara bloqueada (requiere HTTPS)';
     }
     if (!this.hasCameraApi) {
-      return 'Pendiente Fase 2 (cámara no detectada)';
+      return 'Cámara no compatible en este navegador';
     }
-    return 'Listo para Fase 2 (MediaPipe Tasks Vision + Cámara HTTPS)';
+    return 'MediaPipe real inactivo (pulsa Manos ON)';
   }
 
   bindProvider(provider) {
     this.provider = provider;
   }
 
-  update(dt, interactionController) {
-    if (!this.provider) return;
-    const pointer = this.provider.update(dt);
+  update(dt, nowMs, interactionController, showPip = false) {
+    if (!this.provider) {
+      interactionController.setExternalPointer(null);
+      return null;
+    }
+    const pointer = this.provider.update(dt, nowMs, showPip);
     interactionController.setExternalPointer(pointer);
+    return pointer;
   }
 }

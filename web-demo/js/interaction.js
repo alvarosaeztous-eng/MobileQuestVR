@@ -75,9 +75,12 @@ export class VRInteractionController {
     this._rayDir = new THREE.Vector3();
     this._headQuat = new THREE.Quaternion();
 
-    // External hand-tracking pointer (null until Phase 2 MediaPipe activates)
+    // External hand-tracking pointer (driven by real MediaPipeHandTracker in Phase 2)
     this._externalPointer = null;
     this._externalWasPinching = false;
+    this._externalWasFist = false;
+    this._heldByHand = false;
+    this._handLostHoldGrace = 0;
 
     this._buildReticle();
   }
@@ -136,6 +139,8 @@ export class VRInteractionController {
     }
 
     this.heldItem = null;
+    this._heldByHand = false;
+    this._handLostHoldGrace = 0;
     this.audio.play('release');
   }
 
@@ -149,7 +154,7 @@ export class VRInteractionController {
   update(dt) {
     const safeDt = Math.min(Math.max(dt, 0.001), 0.1);
 
-    // Determine active pointer ray (external MediaPipe hand ray if active, otherwise center-eye gaze)
+    // Determine active pointer ray (real MediaPipe hand ray if detected, otherwise center-eye gaze)
     let usingExternal = false;
     if (this._externalPointer && this._externalPointer.active) {
       usingExternal = true;
@@ -176,16 +181,37 @@ export class VRInteractionController {
 
       this._updateReticle(this._rayOrigin, this._rayDir, targetPos, null, true, 0);
 
-      if (usingExternal && !this._externalPointer.isPinching && this._externalWasPinching) {
-        this.releaseHeldObject(true);
+      if (this._heldByHand) {
+        if (usingExternal) {
+          this._handLostHoldGrace = 0;
+          const stillHolding = Boolean(this._externalPointer.isPinching || this._externalPointer.isFist);
+          if (!stillHolding && (this._externalWasPinching || this._externalWasFist)) {
+            this.releaseHeldObject(true);
+          }
+          this._externalWasPinching = Boolean(this._externalPointer.isPinching);
+          this._externalWasFist = Boolean(this._externalPointer.isFist);
+        } else {
+          // Brief grace period against single-frame tracking dropouts before releasing
+          this._handLostHoldGrace += safeDt;
+          if (this._handLostHoldGrace > 0.45) {
+            this.releaseHeldObject(false);
+          }
+        }
+      } else {
+        this._externalWasPinching = usingExternal && Boolean(this._externalPointer.isPinching);
+        this._externalWasFist = usingExternal && Boolean(this._externalPointer.isFist);
       }
-      this._externalWasPinching = usingExternal && Boolean(this._externalPointer.isPinching);
       return;
     }
 
-    // Raycast against all registered interactables
+    // Raycast against visible registered interactables only
     this.raycaster.set(this._rayOrigin, this._rayDir);
-    const meshes = this.interactables.map((item) => item.mesh);
+    const meshes = [];
+    for (const item of this.interactables) {
+      if (this._isMeshEffectivelyVisible(item.mesh)) {
+        meshes.push(item.mesh);
+      }
+    }
     const hits = this.raycaster.intersectObjects(meshes, false);
 
     let hitItem = null;
@@ -205,17 +231,28 @@ export class VRInteractionController {
 
     this._setHoverTarget(hitItem);
 
-    // Handle external hand pinch start
+    // Handle real MediaPipe hand gestures (pinch selects/grabs; fist grabs grabbables)
     if (usingExternal) {
       const pinching = Boolean(this._externalPointer.isPinching);
+      const fist = Boolean(this._externalPointer.isFist);
+
       if (pinching && !this._externalWasPinching && hitItem) {
-        this.holdDistance = THREE.MathUtils.clamp(hitDistance, 0.65, 2.0);
-        this._activateTarget(hitItem);
+        this.holdDistance = THREE.MathUtils.clamp(hitDistance, 0.55, 2.0);
+        this._activateTarget(hitItem, true);
+      } else if (fist && !this._externalWasFist && hitItem && hitItem.canGrab) {
+        this.holdDistance = THREE.MathUtils.clamp(hitDistance, 0.55, 2.0);
+        this._activateTarget(hitItem, true);
       }
+
       this._externalWasPinching = pinching;
-      this._updateReticle(this._rayOrigin, this._rayDir, hitPoint, hitNormal, Boolean(hitItem), this._externalPointer.pinchStrength || 0);
+      this._externalWasFist = fist;
+      const meter = Math.max(this._externalPointer.pinchStrength || 0, fist ? 1 : 0);
+      this._updateReticle(this._rayOrigin, this._rayDir, hitPoint, hitNormal, Boolean(hitItem), meter);
       return;
     }
+
+    this._externalWasPinching = false;
+    this._externalWasFist = false;
 
     // Gaze dwell progression
     let dwellProgress = 0;
@@ -225,11 +262,20 @@ export class VRInteractionController {
       if (this._dwellTimer >= this.dwellSeconds) {
         this._dwellTriggered = true;
         this.holdDistance = THREE.MathUtils.clamp(hitDistance, 0.75, 1.85);
-        this._activateTarget(hitItem);
+        this._activateTarget(hitItem, false);
       }
     }
 
     this._updateReticle(this._rayOrigin, this._rayDir, hitPoint, hitNormal, Boolean(hitItem), dwellProgress);
+  }
+
+  _isMeshEffectivelyVisible(obj) {
+    let curr = obj;
+    while (curr) {
+      if (!curr.visible) return false;
+      curr = curr.parent;
+    }
+    return true;
   }
 
   _setHoverTarget(nextTarget) {
@@ -261,12 +307,14 @@ export class VRInteractionController {
     }
   }
 
-  _activateTarget(item) {
+  _activateTarget(item, fromHand = false) {
     if (item.canGrab) {
       item.isGrabbed = true;
       item.velocity.set(0, 0, 0);
       item.angularVelocity.set(0, 0, 0);
       this.heldItem = item;
+      this._heldByHand = Boolean(fromHand);
+      this._handLostHoldGrace = 0;
       this._lastHoldPos.copy(item.mesh.position);
       this._smoothedVel.set(0, 0, 0);
       this.audio.play('grab');
