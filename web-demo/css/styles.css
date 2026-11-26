@@ -1,0 +1,430 @@
+:root {
+  --bg-deep: #050914;
+  --glass-bg: rgba(8, 16, 32, 0.72);
+  --glass-border: rgba(56, 198, 255, 0.34);
+  --accent-cyan: #2fd6ff;
+  --accent-emerald: #28f0a2;
+  --accent-amber: #ffaa33;
+  --text-main: #eef7ff;
+  --text-muted: #98b4d0;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-deep);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+#vr-viewport {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  background: #000;
+}
+
+#vr-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+/* Aviso HTTPS */
+.banner-warning {
+  position: fixed;
+  top: calc(var(--safe-top) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(92vw, 560px);
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(56, 32, 6, 0.92);
+  border: 1px solid rgba(255, 178, 66, 0.55);
+  color: #ffe8c2;
+  font-size: 12px;
+  line-height: 1.35;
+  backdrop-filter: blur(8px);
+}
+
+.banner-warning button {
+  background: transparent;
+  border: none;
+  color: #ffd085;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+/* HUD Modo Mono / Android */
+.hud-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: calc(var(--safe-top) + 10px) calc(var(--safe-right) + 12px) calc(var(--safe-bottom) + 10px) calc(var(--safe-left) + 12px);
+}
+
+.hud-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+}
+
+.brand-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 12px var(--accent-cyan);
+  flex-shrink: 0;
+}
+
+.brand-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.brand-tag {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(47, 214, 255, 0.18);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(47, 214, 255, 0.4);
+}
+
+.brand-sub {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.telemetry-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.pill {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-main);
+  backdrop-filter: blur(8px);
+}
+
+.pill-active {
+  border-color: rgba(40, 240, 162, 0.65);
+  color: var(--accent-emerald);
+}
+
+.pill-muted {
+  color: var(--text-muted);
+}
+
+/* Indicador de objeto enfocado */
+.target-toast {
+  position: fixed;
+  top: calc(var(--safe-top) + 70px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(8, 22, 42, 0.84);
+  border: 1px solid rgba(47, 214, 255, 0.65);
+  color: #e9f8ff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+}
+
+/* Controles táctiles para objeto agarrado */
+.grab-controls {
+  position: fixed;
+  bottom: calc(var(--safe-bottom) + 104px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.btn-chip {
+  appearance: none;
+  border: 1px solid rgba(47, 214, 255, 0.45);
+  background: rgba(8, 20, 38, 0.86);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  touch-action: manipulation;
+}
+
+.btn-chip.btn-accent {
+  background: linear-gradient(135deg, rgba(40, 240, 162, 0.28), rgba(47, 214, 255, 0.34));
+  border-color: rgba(40, 240, 162, 0.8);
+  color: #e9fff7;
+}
+
+/* Barra inferior de controles */
+.hud-bottombar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  pointer-events: auto;
+  max-width: 100%;
+}
+
+.btn-primary,
+.btn-secondary {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 9px 14px;
+  border-radius: 13px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.12s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #0d74c9 0%, #19b8e6 100%);
+  border: 1px solid rgba(130, 232, 255, 0.85);
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(25, 184, 230, 0.38);
+}
+
+.btn-secondary {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-main);
+  backdrop-filter: blur(10px);
+}
+
+.btn-secondary.btn-highlight {
+  border-color: rgba(40, 240, 162, 0.85);
+  background: rgba(14, 52, 54, 0.88);
+  color: #d8fff0;
+}
+
+.btn-primary:active,
+.btn-secondary:active,
+.btn-chip:active,
+.btn-vr-mini:active {
+  transform: scale(0.95);
+}
+
+.btn-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.touch-hint {
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(5, 10, 22, 0.56);
+  color: var(--text-muted);
+  font-size: 11px;
+  text-align: center;
+  max-width: min(94vw, 660px);
+}
+
+/* HUD minimalista en Modo VR Estereoscópico */
+.hud-stereo {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.stereo-divider {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.9);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
+}
+
+.stereo-top-controls {
+  position: fixed;
+  top: calc(var(--safe-top) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.btn-vr-mini {
+  appearance: none;
+  padding: 6px 12px;
+  min-height: 34px;
+  border-radius: 999px;
+  background: rgba(6, 12, 24, 0.72);
+  border: 1px solid rgba(56, 198, 255, 0.42);
+  color: #d8f2ff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  backdrop-filter: blur(6px);
+}
+
+.stereo-bottom-hint {
+  position: fixed;
+  bottom: calc(var(--safe-bottom) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(5, 10, 20, 0.65);
+  color: rgba(200, 225, 245, 0.78);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* Modal de error WebGL */
+.fatal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(4, 8, 18, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.fatal-card {
+  max-width: 420px;
+  padding: 22px;
+  border-radius: 16px;
+  background: #0c172b;
+  border: 1px solid rgba(255, 100, 100, 0.45);
+  text-align: center;
+}
+
+.fatal-card h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.fatal-card p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Ajustes compactos para teléfonos en horizontal o pantallas estrechas */
+@media (max-height: 460px) {
+  .brand-sub,
+  .touch-hint {
+    display: none;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    min-height: 38px;
+    padding: 6px 11px;
+    font-size: 12px;
+  }
+
+  .grab-controls {
+    bottom: calc(var(--safe-bottom) + 60px);
+  }
+}
+
+@media (max-width: 520px) {
+  .btn-primary,
+  .btn-secondary {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .brand-title {
+    font-size: 13px;
+  }
+}

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#081224" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>MobileQuestVR Web — Realidad Virtual 3D para Android</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <!-- Contenedor WebGL principal -->
+  <div id="vr-viewport" aria-label="Escena 3D de Realidad Virtual">
+    <canvas id="vr-canvas"></canvas>
+  </div>
+
+  <!-- Aviso automático si no se abre bajo HTTPS (requerido por Chrome Android para sensores/cámara) -->
+  <div id="https-warning" class="banner-warning hidden" role="alert">
+    <span>⚠ Para giroscopio y cámara en Android Chrome abre esta app mediante <strong>HTTPS</strong> (ej. GitHub Pages).</span>
+    <button id="btn-dismiss-https" type="button" aria-label="Cerrar aviso">✕</button>
+  </div>
+
+  <!-- HUD táctil optimizado para Android (modo normal / Mono) -->
+  <div id="hud-mono" class="hud-layer">
+    <header class="hud-topbar">
+      <div class="brand-group">
+        <span class="brand-dot" aria-hidden="true"></span>
+        <div>
+          <h1 class="brand-title">MobileQuestVR <span class="brand-tag">WEB</span></h1>
+          <p id="status-subtitle" class="brand-sub">Cargando habitación 3D…</p>
+        </div>
+      </div>
+
+      <div class="telemetry-pills">
+        <span id="pill-sensor" class="pill pill-muted">Táctil</span>
+        <span id="pill-fps" class="pill">-- FPS</span>
+      </div>
+    </header>
+
+    <!-- Indicador contextual del objeto apuntado -->
+    <div id="target-toast" class="target-toast hidden" aria-live="polite">
+      <span id="target-label">Objeto</span>
+    </div>
+
+    <!-- Controles táctiles para mover la distancia del objeto agarrado -->
+    <div id="grab-controls" class="grab-controls hidden">
+      <button id="btn-grab-near" class="btn-chip" type="button">− Acercar</button>
+      <button id="btn-grab-release" class="btn-chip btn-accent" type="button">Soltar / Lanzar</button>
+      <button id="btn-grab-far" class="btn-chip" type="button">+ Alejar</button>
+    </div>
+
+    <!-- Barra inferior ergonómica para pulgares en Android -->
+    <footer class="hud-bottombar">
+      <div class="control-row">
+        <button id="btn-vr-mode" class="btn-primary" type="button">
+          <span class="btn-icon" aria-hidden="true">🕶</span>
+          <span>Modo VR</span>
+        </button>
+
+        <button id="btn-recenter" class="btn-secondary" type="button" title="Recentrar vista (R)">
+          <span class="btn-icon" aria-hidden="true">◎</span>
+          <span>Recentrar</span>
+        </button>
+
+        <button id="btn-action" class="btn-secondary" type="button" title="Seleccionar / Agarrar objeto">
+          <span class="btn-icon" aria-hidden="true">✦</span>
+          <span id="btn-action-text">Interactuar</span>
+        </button>
+
+        <button id="btn-summon-menu" class="btn-secondary" type="button" title="Traer menú 3D al frente (M)">
+          <span class="btn-icon" aria-hidden="true">☰</span>
+          <span>Menú 3D</span>
+        </button>
+
+        <button id="btn-sensor" class="btn-secondary" type="button" title="Activar giroscopio">
+          <span class="btn-icon" aria-hidden="true">↻</span>
+          <span id="btn-sensor-text">Giroscopio</span>
+        </button>
+      </div>
+
+      <p id="touch-hint" class="touch-hint">
+        Arrastra para mirar • Apunta con la retícula (1.1s) o pulsa <strong>Interactuar</strong> para agarrar/activar objetos y botones 3D
+      </p>
+    </footer>
+  </div>
+
+  <!-- Controles minimalistas centrados sobre el divisor en modo estereoscópico VR -->
+  <div id="hud-stereo" class="hud-stereo hidden">
+    <div class="stereo-divider" aria-hidden="true"></div>
+    <div class="stereo-top-controls">
+      <button id="btn-exit-vr" class="btn-vr-mini" type="button">✕ Salir VR</button>
+      <button id="btn-recenter-vr" class="btn-vr-mini" type="button">◎ Recentrar</button>
+    </div>
+    <div class="stereo-bottom-hint">
+      <span>Toca la pantalla para seleccionar / soltar • Mira los botones del menú 3D</span>
+    </div>
+  </div>
+
+  <!-- Modal ligero de error WebGL si el dispositivo no soporta aceleración 3D -->
+  <div id="webgl-error" class="fatal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="fatal-card">
+      <h2>WebGL no disponible</h2>
+      <p id="webgl-error-msg">Tu navegador no pudo inicializar WebGL para renderizar la escena 3D.</p>
+    </div>
+  </div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
