@@ -9,9 +9,10 @@ import { VRInteractionController } from './interaction.js';
 import { CameraManager } from './cameraManager.js';
 import { MediaPipeHandTracker } from './handTracking.js';
 import { HandTrackingBridge } from './handTrackingHook.js';
+import { YouTubeCinemaScreen3D, CURATED_YOUTUBE_VIDEOS } from './youtubeScreen.js';
 
 /**
- * MobileQuestVR Web (Phase 2) — Entry point & Android Chrome VR / Mixed-Reality lifecycle manager.
+ * MobileQuestVR Web — Entry point & Android Chrome VR / Mixed-Reality / 3D YouTube Cinema manager.
  */
 class MobileQuestVRWebApp {
   constructor() {
@@ -19,20 +20,49 @@ class MobileQuestVRWebApp {
     this.viewportEl = document.getElementById('vr-viewport');
 
     this.ui = {
+      // CSS3D Dual-Eye YouTube Stage
+      css3dLeft: document.getElementById('css3d-left'),
+      css3dCameraLeft: document.getElementById('css3d-camera-left'),
+      ytCardLeft: document.getElementById('yt-card-left'),
+      ytPlayerLeft: document.getElementById('yt-player-left'),
+      css3dRight: document.getElementById('css3d-right'),
+      css3dCameraRight: document.getElementById('css3d-camera-right'),
+      ytCardRight: document.getElementById('yt-card-right'),
+      ytPlayerRight: document.getElementById('yt-player-right'),
+
+      // Banners & Modals
       httpsWarning: document.getElementById('https-warning'),
       btnDismissHttps: document.getElementById('btn-dismiss-https'),
       cameraAlert: document.getElementById('camera-alert'),
       cameraAlertText: document.getElementById('camera-alert-text'),
       btnDismissCameraAlert: document.getElementById('btn-dismiss-camera-alert'),
+
+      youtubeErrorBanner: document.getElementById('youtube-error-banner'),
+      ytErrorText: document.getElementById('yt-error-text'),
+      ytErrorExternalLink: document.getElementById('yt-error-external-link'),
+      btnYtErrorPick: document.getElementById('btn-yt-error-pick'),
+      btnYtErrorClose: document.getElementById('btn-yt-error-close'),
+
       externalLinkBar: document.getElementById('external-link-bar'),
       externalLinkTitle: document.getElementById('external-link-title'),
       externalLinkNote: document.getElementById('external-link-note'),
       externalLinkAnchor: document.getElementById('external-link-anchor'),
       btnCloseExternalLink: document.getElementById('btn-close-external-link'),
 
+      youtubePickerModal: document.getElementById('youtube-picker-modal'),
+      btnYtPickerClose: document.getElementById('btn-yt-picker-close'),
+      btnYtPickerDone: document.getElementById('btn-yt-picker-done'),
+      ytUrlForm: document.getElementById('yt-url-form'),
+      ytUrlInput: document.getElementById('yt-url-input'),
+      ytUrlError: document.getElementById('yt-url-error'),
+      ytPresetsList: document.getElementById('yt-presets-list'),
+      ytPickerExternalLink: document.getElementById('yt-picker-external-link'),
+
+      // Mono HUD
       hudMono: document.getElementById('hud-mono'),
       hudStereo: document.getElementById('hud-stereo'),
       statusSubtitle: document.getElementById('status-subtitle'),
+      pillYoutube: document.getElementById('pill-youtube'),
       pillPassthrough: document.getElementById('pill-passthrough'),
       pillHands: document.getElementById('pill-hands'),
       pillSensor: document.getElementById('pill-sensor'),
@@ -45,12 +75,23 @@ class MobileQuestVRWebApp {
 
       targetToast: document.getElementById('target-toast'),
       targetLabel: document.getElementById('target-label'),
+
+      youtubeControlsBar: document.getElementById('youtube-controls-bar'),
+      btnYtPlay: document.getElementById('btn-yt-play'),
+      btnYtPause: document.getElementById('btn-yt-pause'),
+      btnYtSize: document.getElementById('btn-yt-size'),
+      btnYtPick: document.getElementById('btn-yt-pick'),
+      btnYtBring: document.getElementById('btn-yt-bring'),
+      btnYtClose: document.getElementById('btn-yt-close'),
+
       grabControls: document.getElementById('grab-controls'),
       btnGrabNear: document.getElementById('btn-grab-near'),
       btnGrabFar: document.getElementById('btn-grab-far'),
       btnGrabRelease: document.getElementById('btn-grab-release'),
 
       btnHome: document.getElementById('btn-home'),
+      btnYoutubeOpen: document.getElementById('btn-youtube-open'),
+      btnYoutubeOpenText: document.getElementById('btn-youtube-open-text'),
       btnVrMode: document.getElementById('btn-vr-mode'),
       btnVrModeText: document.getElementById('btn-vr-mode-text'),
       btnPassthrough: document.getElementById('btn-passthrough'),
@@ -66,11 +107,16 @@ class MobileQuestVRWebApp {
       btnFlipCamera: document.getElementById('btn-flip-camera'),
       btnFlipCameraText: document.getElementById('btn-flip-camera-text'),
 
+      // Stereo HUD
       btnExitVr: document.getElementById('btn-exit-vr'),
       btnHomeVr: document.getElementById('btn-home-vr'),
       btnRecenterVr: document.getElementById('btn-recenter-vr'),
       btnPassthroughVr: document.getElementById('btn-passthrough-vr'),
       btnHandsVr: document.getElementById('btn-hands-vr'),
+      btnYtPlayVr: document.getElementById('btn-yt-play-vr'),
+      btnYtPauseVr: document.getElementById('btn-yt-pause-vr'),
+      btnYtSizeVr: document.getElementById('btn-yt-size-vr'),
+      btnYtCloseVr: document.getElementById('btn-yt-close-vr'),
 
       fatalError: document.getElementById('webgl-error'),
       fatalErrorMsg: document.getElementById('webgl-error-msg'),
@@ -124,9 +170,45 @@ class MobileQuestVRWebApp {
       this.handBridge = new HandTrackingBridge();
       this.handBridge.bindProvider(this.handTracker);
 
-      // Meta Quest-style 3D Floating Apps Launcher (Chrome, YouTube, Google, Ajustes, Volver)
+      // Real Official YouTube 3D Cinema Screen (Dual-Eye CSS3D + 3D WebGL Frame + 3D Controls)
+      this.youtubeScreen = new YouTubeCinemaScreen3D({
+        scene: this.scene,
+        headAnchor: this.stereo.centerEyeAnchor,
+        audio: this.audio,
+        stageLeftEl: this.ui.css3dLeft,
+        cameraLeftEl: this.ui.css3dCameraLeft,
+        cardLeftEl: this.ui.ytCardLeft,
+        mountLeftEl: this.ui.ytPlayerLeft,
+        stageRightEl: this.ui.css3dRight,
+        cameraRightEl: this.ui.css3dCameraRight,
+        cardRightEl: this.ui.ytCardRight,
+        mountRightEl: this.ui.ytPlayerRight,
+        callbacks: {
+          onOpenUrlPicker: () => this.openYouTubePicker(),
+          onOpenStateChange: (isOpen) => {
+            // Keep WebGL and CSS3D YouTube aligned pixel-for-pixel in Stereo VR
+            this.stereo.setForceDirectStereo(isOpen);
+            if (!isOpen) {
+              this._hideYouTubeError();
+            }
+            this._syncUiState();
+          },
+          onStateChange: () => {
+            this._syncUiState();
+          },
+          onPlayerError: (errInfo) => {
+            this._showYouTubeError(errInfo);
+          },
+          onClearError: () => {
+            this._hideYouTubeError();
+          },
+        },
+      });
+
+      // Meta Quest-style 3D Floating Apps Launcher (Chrome, YouTube 3D VR, Google, Ajustes, Volver)
       this.appsMenu = new AppsMenu3D(this.scene, this.stereo.centerEyeAnchor, this.audio, {
         onOpenExternalApp: (name, url) => this.openExternalApp(name, url),
+        onOpenYouTubeVR: () => this.openYouTubeCinema(),
         onOpenSettings: () => this.floatingMenu.summonInFrontOfHead(),
         onReturnToVR: () => this.returnToMobileQuestVR(),
       });
@@ -159,10 +241,11 @@ class MobileQuestVRWebApp {
 
       this.telemetryBoard = new TelemetryBoard3D(this.scene, this.room.telemetryMount);
 
-      // Register room objects, 3D settings menu, and 3D apps launcher into unified raycaster
+      // Register room objects, 3D settings menu, 3D apps launcher, and 3D YouTube cinema controls
       this.interaction.registerInteractables(this.room.interactables);
       this.interaction.registerInteractables(this.floatingMenu.interactables);
       this.interaction.registerInteractables(this.appsMenu.interactables);
+      this.interaction.registerInteractables(this.youtubeScreen.interactables);
 
       // Single tap on canvas unlocks audio and triggers gaze/object interaction
       this.headTracker.onCanvasTap = () => {
@@ -170,16 +253,37 @@ class MobileQuestVRWebApp {
         this.interaction.triggerPrimaryAction();
       };
 
+      this._populateYouTubePresets();
       this._bindUiEvents();
       this.headTracker.tryAutoStartSensors();
       this._syncUiState();
 
-      this.ui.statusSubtitle.textContent = 'Entorno 3D activo • Manos MediaPipe y Passthrough listos';
+      this.ui.statusSubtitle.textContent = 'Entorno 3D activo • YouTube 3D, Manos MediaPipe y Passthrough listos';
       requestAnimationFrame((t) => this._animate(t));
     } catch (err) {
       console.error('[MobileQuestVR Web] Initialization error:', err);
       this.ui.fatalErrorMsg.textContent = `No se pudo iniciar WebGL: ${err?.message || err}`;
       this.ui.fatalError.classList.remove('hidden');
+    }
+  }
+
+  _populateYouTubePresets() {
+    if (!this.ui.ytPresetsList) return;
+    this.ui.ytPresetsList.innerHTML = '';
+
+    for (const preset of CURATED_YOUTUBE_VIDEOS) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'yt-preset-btn';
+      btn.innerHTML = `<strong>${preset.title}</strong><span>${preset.subtitle}</span>`;
+      btn.addEventListener('click', async () => {
+        this.audio.unlock();
+        this.ui.ytUrlError.classList.add('hidden');
+        this.closeYouTubePicker();
+        await this.youtubeScreen.loadVideo(preset.id, preset.title);
+        this.ui.statusSubtitle.textContent = `YouTube 3D listo: ${preset.title} (pulsa ▶ manualmente)`;
+      });
+      this.ui.ytPresetsList.appendChild(btn);
     }
   }
 
@@ -220,6 +324,48 @@ class MobileQuestVRWebApp {
     this.ui.cameraAlert.classList.add('hidden');
   }
 
+  _showYouTubeError(errInfo) {
+    this.ui.ytErrorText.textContent = errInfo.message || 'Este vídeo no permite reproducción incrustada en YouTube.';
+    this.ui.ytErrorExternalLink.href = errInfo.externalUrl || this.youtubeScreen.externalUrl;
+    this.ui.youtubeErrorBanner.classList.remove('hidden');
+    this.ui.statusSubtitle.textContent = 'YouTube: vídeo bloqueado para incrustar (enlace externo disponible)';
+  }
+
+  _hideYouTubeError() {
+    this.ui.youtubeErrorBanner.classList.add('hidden');
+  }
+
+  openYouTubePicker() {
+    this.ui.ytUrlError.classList.add('hidden');
+    this.ui.ytPickerExternalLink.href = this.youtubeScreen.externalUrl;
+    this.ui.youtubePickerModal.classList.remove('hidden');
+  }
+
+  closeYouTubePicker() {
+    this.ui.youtubePickerModal.classList.add('hidden');
+  }
+
+  async openYouTubeCinema() {
+    this.appsMenu.setVisible(false);
+    await this.youtubeScreen.open();
+    if (this.stereo.stereoEnabled) {
+      await this.youtubeScreen.setStereoMode(true);
+      this._showCameraAlert(
+        'YouTube 3D activo en Modo Estéreo (2 ojos sincronizados con youtube-nocookie.com y proyección directa alineada). Pulsa ▶ manualmente para iniciar.',
+        'info',
+        5500
+      );
+    } else {
+      this._showCameraAlert(
+        'Pantalla flotante 3D de YouTube lista. Pulsa ▶ Reproducir manualmente o toca 🔗 Cambiar URL para cargar cualquier vídeo.',
+        'info',
+        4500
+      );
+    }
+    this.ui.statusSubtitle.textContent = `YouTube 3D abierto • ${this.youtubeScreen.currentVideoTitle}`;
+    this._syncUiState();
+  }
+
   _bindUiEvents() {
     window.addEventListener('resize', () => {
       this.stereo.resize(window.innerWidth, window.innerHeight);
@@ -241,6 +387,97 @@ class MobileQuestVRWebApp {
 
     this.ui.btnCloseExternalLink.addEventListener('click', () => {
       this.ui.externalLinkBar.classList.add('hidden');
+    });
+
+    // YouTube Error Banner buttons
+    this.ui.btnYtErrorClose.addEventListener('click', () => {
+      this._hideYouTubeError();
+    });
+    this.ui.btnYtErrorPick.addEventListener('click', () => {
+      this._hideYouTubeError();
+      this.openYouTubePicker();
+    });
+
+    // YouTube Picker Modal
+    this.ui.btnYtPickerClose.addEventListener('click', () => this.closeYouTubePicker());
+    this.ui.btnYtPickerDone.addEventListener('click', () => this.closeYouTubePicker());
+    this.ui.youtubePickerModal.addEventListener('click', (e) => {
+      if (e.target === this.ui.youtubePickerModal) {
+        this.closeYouTubePicker();
+      }
+    });
+
+    this.ui.ytUrlForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      this.audio.unlock();
+      const raw = this.ui.ytUrlInput.value;
+      const res = await this.youtubeScreen.loadVideo(raw);
+      if (!res.ok) {
+        this.ui.ytUrlError.textContent = res.error;
+        this.ui.ytUrlError.classList.remove('hidden');
+        return;
+      }
+      this.ui.ytUrlError.classList.add('hidden');
+      this.ui.ytUrlInput.value = '';
+      this.closeYouTubePicker();
+      if (this.stereo.stereoEnabled) {
+        await this.youtubeScreen.setStereoMode(true);
+      }
+      this.ui.statusSubtitle.textContent = `Vídeo cargado (${res.videoId}) • Pulsa ▶ manualmente para reproducir`;
+      this._syncUiState();
+    });
+
+    // YouTube HUD & Stereo Controls
+    this.ui.btnYoutubeOpen.addEventListener('click', () => {
+      this.audio.unlock();
+      if (this.youtubeScreen.isOpen) {
+        this.youtubeScreen.summonInFrontOfHead();
+      } else {
+        this.openYouTubeCinema();
+      }
+    });
+
+    this.ui.btnYtPlay.addEventListener('click', () => {
+      this.audio.unlock();
+      this.youtubeScreen.play();
+    });
+    this.ui.btnYtPause.addEventListener('click', () => {
+      this.audio.unlock();
+      this.youtubeScreen.pause();
+    });
+    this.ui.btnYtSize.addEventListener('click', () => {
+      this.audio.unlock();
+      this.youtubeScreen.cycleSize();
+    });
+    this.ui.btnYtPick.addEventListener('click', () => {
+      this.audio.unlock();
+      this.openYouTubePicker();
+    });
+    this.ui.btnYtBring.addEventListener('click', () => {
+      this.audio.unlock();
+      this.youtubeScreen.summonInFrontOfHead();
+    });
+    this.ui.btnYtClose.addEventListener('click', () => {
+      this.audio.unlock();
+      this.youtubeScreen.close();
+      this.ui.statusSubtitle.textContent = 'Pantalla YouTube 3D cerrada';
+    });
+
+    this.ui.btnYtPlayVr.addEventListener('click', () => {
+      this.audio.unlock();
+      this.youtubeScreen.play();
+    });
+    this.ui.btnYtPauseVr.addEventListener('click', () => {
+      this.audio.unlock();
+      this.youtubeScreen.pause();
+    });
+    this.ui.btnYtSizeVr.addEventListener('click', () => {
+      this.audio.unlock();
+      this.youtubeScreen.cycleSize();
+    });
+    this.ui.btnYtCloseVr.addEventListener('click', () => {
+      this.audio.unlock();
+      this.youtubeScreen.close();
     });
 
     // Home / Apps Launcher
@@ -342,14 +579,23 @@ class MobileQuestVRWebApp {
       }
     }, { passive: true });
 
-    // Desktop keyboard shortcuts
+    // Desktop keyboard shortcuts (ignored while typing inside URL input)
     window.addEventListener('keydown', (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+        if (e.code === 'Escape') {
+          this.closeYouTubePicker();
+        }
+        return;
+      }
+
       if (e.code === 'KeyR') {
         this.recenterView();
       } else if (e.code === 'KeyM') {
         this.floatingMenu.summonInFrontOfHead();
       } else if (e.code === 'KeyH') {
         this.summonHomeApps();
+      } else if (e.code === 'KeyY') {
+        this.openYouTubeCinema();
       } else if (e.code === 'KeyP') {
         this.togglePassthrough();
       } else if (e.code === 'Space') {
@@ -358,8 +604,12 @@ class MobileQuestVRWebApp {
         this.interaction.triggerPrimaryAction();
       } else if (e.code === 'KeyV') {
         this.toggleVrMode();
-      } else if (e.code === 'Escape' && this.stereo.stereoEnabled) {
-        this.exitVrMode();
+      } else if (e.code === 'Escape') {
+        if (!this.ui.youtubePickerModal.classList.contains('hidden')) {
+          this.closeYouTubePicker();
+        } else if (this.stereo.stereoEnabled) {
+          this.exitVrMode();
+        }
       }
     });
 
@@ -382,11 +632,6 @@ class MobileQuestVRWebApp {
       : 'MobileQuestVR • Habitación Virtual 3D';
   }
 
-  /**
-   * Opens external web apps honestly in a new tab / Android compatible app link.
-   * Never fakes private apps inside iframes. Shows a 1-tap fallback if popup is blocked
-   * (which commonly occurs when invoked by Gaze Dwell or Hand Pinch instead of direct tap).
-   */
   openExternalApp(name, url) {
     this.ui.externalLinkTitle.textContent = `Abrir ${name}`;
     this.ui.externalLinkAnchor.href = url;
@@ -528,6 +773,7 @@ class MobileQuestVRWebApp {
 
   async enterVrMode() {
     this.stereo.setStereoEnabled(true);
+    await this.youtubeScreen.setStereoMode(true);
     this._syncUiState();
     this.audio.play('select');
 
@@ -541,7 +787,7 @@ class MobileQuestVRWebApp {
         await rootEl.requestFullscreen({ navigationUI: 'hide' });
       }
     } catch {
-      // Fullscreen may be blocked in embedded iframes; stereo split still works cleanly
+      // Fullscreen optional
     }
 
     try {
@@ -567,6 +813,7 @@ class MobileQuestVRWebApp {
 
   async exitVrMode() {
     this.stereo.setStereoEnabled(false);
+    await this.youtubeScreen.setStereoMode(false);
     this._syncUiState();
 
     try {
@@ -611,6 +858,7 @@ class MobileQuestVRWebApp {
   }
 
   _shutdownHardware() {
+    this.youtubeScreen?.dispose();
     this.handTracker?.dispose();
     this.cameraManager?.stopAll();
   }
@@ -622,6 +870,26 @@ class MobileQuestVRWebApp {
 
     // VR / Normal mode button label
     this.ui.btnVrModeText.textContent = isStereo ? 'Modo Normal' : 'Modo VR';
+
+    // YouTube 3D Cinema state
+    const ytOpen = this.youtubeScreen.isOpen;
+    const sizeShort = this.youtubeScreen.currentSizePreset.shortLabel;
+    this.ui.btnYoutubeOpen.classList.toggle('btn-active', ytOpen);
+    this.ui.btnYoutubeOpenText.textContent = ytOpen ? 'YouTube: ON' : 'YouTube 3D';
+    this.ui.pillYoutube.classList.toggle('hidden', !ytOpen);
+    this.ui.pillYoutube.textContent = `YouTube 3D (${sizeShort})`;
+    this.ui.pillYoutube.classList.toggle('pill-active', ytOpen && this.youtubeScreen.playbackState === 'playing');
+    this.ui.pillYoutube.classList.toggle('pill-warn', ytOpen && this.youtubeScreen.playbackState === 'error');
+    this.ui.pillYoutube.classList.toggle('pill-muted', !ytOpen || (this.youtubeScreen.playbackState !== 'playing' && this.youtubeScreen.playbackState !== 'error'));
+
+    this.ui.btnYtSize.textContent = `Tamaño: ${sizeShort}`;
+    this.ui.btnYtSizeVr.textContent = `Tam: ${sizeShort}`;
+    this.ui.ytPickerExternalLink.href = this.youtubeScreen.externalUrl;
+
+    // Show/hide stereo mini YouTube controls
+    for (const el of [this.ui.btnYtPlayVr, this.ui.btnYtPauseVr, this.ui.btnYtSizeVr, this.ui.btnYtCloseVr]) {
+      el.classList.toggle('hidden', !ytOpen);
+    }
 
     // Head tracking pill & button
     const headEnabled = this.headTracker.headTrackingEnabled;
@@ -736,10 +1004,13 @@ class MobileQuestVRWebApp {
     this.floatingMenu.update(dt);
     this.appsMenu.update(dt);
 
-    // 7. Stereoscopic VR or Normal Mono WebGL render (with optional Passthrough backdrop)
+    // 7. Stereoscopic VR or Normal Mono WebGL render (updates camera world matrices)
     this.stereo.render(this.scene);
 
-    // 8. Live HUD updates, camera occlusion check & 3D Telemetry Board at ~4 Hz
+    // 8. Exact frame-locked Dual-Eye CSS3D projection & stereo sync for YouTube 3D Cinema Screen
+    this.youtubeScreen.update(dt, this.stereo);
+
+    // 9. Live HUD updates, camera occlusion check & 3D Telemetry Board at ~4 Hz
     this._updateLiveHud(dt);
   }
 
@@ -749,6 +1020,7 @@ class MobileQuestVRWebApp {
 
     if (!this.stereo.stereoEnabled) {
       this.ui.grabControls.classList.toggle('hidden', !isHolding);
+      this.ui.youtubeControlsBar.classList.toggle('hidden', !this.youtubeScreen.isOpen || isHolding);
 
       if (hoveredLabel) {
         this.ui.targetLabel.textContent = hoveredLabel;
@@ -795,16 +1067,22 @@ class MobileQuestVRWebApp {
         ? `Cámara real activa (${this.cameraManager.getFacingLabelEs()})${this._occlusionWarned ? ' [¡LENTE TAPADA!]' : ''}`
         : 'Sala Virtual 3D';
 
+      const ytSummary = this.youtubeScreen.isOpen
+        ? `Abierto (${this.youtubeScreen.currentSizePreset.shortLabel}) — ${this.youtubeScreen.playbackState}`
+        : 'Cerrado (abre desde Inicio → YouTube)';
+
       this.telemetryBoard.refresh({
         fps: this._currentFps,
         stereoEnabled: this.stereo.stereoEnabled,
         barrelEnabled: this.stereo.barrelDistortionEnabled,
+        forceDirectStereo: this.stereo.forceDirectStereo,
         ipdMm: this.stereo.getIpdMillimeters(),
         sensorLabel: this.headTracker.sensorStatusLabel,
         euler: this.headTracker.telemetryEulerDeg,
         targetLabel: hoveredLabel || 'Ninguno',
         handStatus: this.handBridge.getStatusSummary(),
         passthroughStatus: passthroughSummary,
+        youtubeStatus: ytSummary,
         gestureLabel: this.handTracker.enabled ? this.handTracker.primaryGestureLabel : '—',
       });
     }

@@ -7,14 +7,32 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>MobileQuestVR Web — Realidad Virtual y Mixta para Android</title>
+  <title>MobileQuestVR Web — Realidad Virtual, Mixta y Cine YouTube 3D</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="stylesheet" href="./css/styles.css" />
 </head>
 <body>
-  <!-- Contenedor WebGL principal (incluye escena 3D y fondo Passthrough de cámara real) -->
+  <!-- Contenedor WebGL principal (escena 3D, marcos holográficos y fondo Passthrough) -->
   <div id="vr-viewport" aria-label="Escena 3D de Realidad Virtual y Mixta">
     <canvas id="vr-canvas"></canvas>
+  </div>
+
+  <!-- Capa CSS3D sincronizada en 1 ojo (Mono) o 2 ojos (Estéreo VR) para reproductor oficial YouTube -->
+  <div id="css3d-stage" aria-label="Pantalla flotante 3D de YouTube">
+    <div id="css3d-left" class="css3d-eye hidden">
+      <div id="css3d-camera-left" class="css3d-camera">
+        <div id="yt-card-left" class="yt-css3d-card">
+          <div id="yt-player-left"></div>
+        </div>
+      </div>
+    </div>
+    <div id="css3d-right" class="css3d-eye is-stereo-right hidden">
+      <div id="css3d-camera-right" class="css3d-camera">
+        <div id="yt-card-right" class="yt-css3d-card">
+          <div id="yt-player-right"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Aviso automático si no se abre bajo HTTPS (requerido por Chrome Android para sensores/cámara) -->
@@ -29,7 +47,20 @@
     <button id="btn-dismiss-camera-alert" type="button" aria-label="Cerrar alerta">✕</button>
   </div>
 
-  <!-- Barra de apertura externa (fallback honesto si Chrome bloquea ventanas emergentes por mirada/gesto) -->
+  <!-- Aviso honesto cuando un vídeo de YouTube bloquea reproducción incrustada (error 101/150/etc.) -->
+  <div id="youtube-error-banner" class="youtube-error-banner hidden" role="alert" aria-live="polite">
+    <div class="youtube-error-info">
+      <strong>Aviso de YouTube incrustado</strong>
+      <span id="yt-error-text">Este vídeo no permite reproducción incrustada.</span>
+    </div>
+    <div class="youtube-error-actions">
+      <a id="yt-error-external-link" class="btn-chip btn-accent" href="https://m.youtube.com/" target="_blank" rel="noopener noreferrer">Abrir en YouTube ↗</a>
+      <button id="btn-yt-error-pick" class="btn-chip" type="button">Otro vídeo</button>
+      <button id="btn-yt-error-close" class="btn-chip" type="button" aria-label="Cerrar aviso">✕</button>
+    </div>
+  </div>
+
+  <!-- Barra de apertura externa (Chrome / Google o respaldo cuando Chrome bloquea popups) -->
   <div id="external-link-bar" class="external-link-bar hidden" role="region" aria-live="polite">
     <div class="external-link-info">
       <strong id="external-link-title">Enlace externo</strong>
@@ -41,18 +72,58 @@
     </div>
   </div>
 
+  <!-- Modal selector de URL / vídeo de YouTube 3D -->
+  <div id="youtube-picker-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="yt-picker-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 id="yt-picker-title">YouTube 3D en VR</h2>
+          <p class="modal-subtitle">Reproductor oficial (<code>youtube-nocookie.com</code> + IFrame API). Pulsa ▶ manualmente para iniciar.</p>
+        </div>
+        <button id="btn-yt-picker-close" class="btn-modal-close" type="button" aria-label="Cerrar selector">✕</button>
+      </div>
+
+      <form id="yt-url-form" class="yt-url-form">
+        <label for="yt-url-input" class="yt-input-label">Pega una URL de YouTube o ID de vídeo (11 caracteres):</label>
+        <div class="yt-input-row">
+          <input
+            id="yt-url-input"
+            type="url"
+            inputmode="url"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="https://www.youtube.com/watch?v=... o https://youtu.be/..."
+          />
+          <button id="btn-yt-load-url" class="btn-primary" type="submit">Cargar 3D</button>
+        </div>
+        <p id="yt-url-error" class="yt-form-error hidden" role="alert"></p>
+      </form>
+
+      <div class="yt-presets-section">
+        <p class="yt-presets-title">Vídeos de prueba compatibles con incrustación:</p>
+        <div id="yt-presets-list" class="yt-presets-list"></div>
+      </div>
+
+      <div class="modal-footer">
+        <a id="yt-picker-external-link" class="btn-chip" href="https://m.youtube.com/" target="_blank" rel="noopener noreferrer">Abrir vídeo actual en YouTube externo ↗</a>
+        <button id="btn-yt-picker-done" class="btn-secondary" type="button">Volver al entorno VR</button>
+      </div>
+    </div>
+  </div>
+
   <!-- HUD táctil optimizado para Android (Modo Normal / Mono) -->
   <div id="hud-mono" class="hud-layer">
     <header class="hud-topbar">
       <div class="brand-group">
         <span class="brand-dot" aria-hidden="true"></span>
         <div>
-          <h1 class="brand-title">MobileQuestVR <span class="brand-tag">FASE 2</span></h1>
+          <h1 class="brand-title">MobileQuestVR <span class="brand-tag">VR 3D</span></h1>
           <p id="status-subtitle" class="brand-sub">Cargando entorno 3D…</p>
         </div>
       </div>
 
       <div class="telemetry-pills">
+        <span id="pill-youtube" class="pill pill-muted hidden">YouTube 3D</span>
         <span id="pill-passthrough" class="pill pill-muted">Sala 3D</span>
         <span id="pill-hands" class="pill pill-muted">Manos: OFF</span>
         <span id="pill-sensor" class="pill pill-muted">Táctil</span>
@@ -74,6 +145,16 @@
       <span id="target-label">Objeto</span>
     </div>
 
+    <!-- Barra rápida de controles de la pantalla 3D de YouTube (visible solo cuando YouTube 3D está abierto) -->
+    <div id="youtube-controls-bar" class="youtube-controls-bar hidden" role="toolbar" aria-label="Controles de pantalla YouTube 3D">
+      <button id="btn-yt-play" class="btn-chip btn-yt-play" type="button">▶ Reproducir</button>
+      <button id="btn-yt-pause" class="btn-chip" type="button">⏸ Pausar</button>
+      <button id="btn-yt-size" class="btn-chip" type="button">Tamaño: M</button>
+      <button id="btn-yt-pick" class="btn-chip" type="button">🔗 Cambiar URL</button>
+      <button id="btn-yt-bring" class="btn-chip" type="button">◎ Traer aquí</button>
+      <button id="btn-yt-close" class="btn-chip btn-yt-close" type="button">✕ Cerrar YT</button>
+    </div>
+
     <!-- Controles táctiles para mover la distancia del objeto agarrado -->
     <div id="grab-controls" class="grab-controls hidden">
       <button id="btn-grab-near" class="btn-chip" type="button">− Acercar</button>
@@ -87,6 +168,11 @@
         <button id="btn-home" class="btn-secondary" type="button" title="Abrir menú flotante de aplicaciones (H)">
           <span class="btn-icon" aria-hidden="true">⌂</span>
           <span>Inicio</span>
+        </button>
+
+        <button id="btn-youtube-open" class="btn-secondary" type="button" title="Abrir o enfocar pantalla flotante 3D de YouTube (Y)">
+          <span class="btn-icon" aria-hidden="true">▶</span>
+          <span id="btn-youtube-open-text">YouTube 3D</span>
         </button>
 
         <button id="btn-vr-mode" class="btn-primary" type="button" title="Cambiar entre Modo VR y Modo Normal (V)">
@@ -131,7 +217,7 @@
       </div>
 
       <p id="touch-hint" class="touch-hint">
-        Arrastra para mirar • <strong>Inicio</strong> abre apps 3D • <strong>Manos</strong> activa MediaPipe real (Pinza / Puño / Mano abierta) • <strong>Passthrough</strong> muestra la cámara real
+        <strong>YouTube 3D</strong> o <strong>Inicio</strong> abren el cine VR dentro del entorno • Arrastra fuera del vídeo para mirar • Pulsa ▶ manualmente para reproducir
       </p>
     </footer>
   </div>
@@ -145,9 +231,13 @@
       <button id="btn-recenter-vr" class="btn-vr-mini" type="button">◎ Recentrar</button>
       <button id="btn-passthrough-vr" class="btn-vr-mini" type="button">📷 Passth.</button>
       <button id="btn-hands-vr" class="btn-vr-mini" type="button">✋ Manos</button>
+      <button id="btn-yt-play-vr" class="btn-vr-mini btn-yt-mini hidden" type="button">▶ YT</button>
+      <button id="btn-yt-pause-vr" class="btn-vr-mini btn-yt-mini hidden" type="button">⏸ YT</button>
+      <button id="btn-yt-size-vr" class="btn-vr-mini btn-yt-mini hidden" type="button">Tam: M</button>
+      <button id="btn-yt-close-vr" class="btn-vr-mini btn-yt-mini hidden" type="button">✕ YT</button>
     </div>
     <div class="stereo-bottom-hint">
-      <span>Toca o haz pinza para seleccionar/agarrar • Mano abierta (1s) abre Inicio • Mira el panel 3D</span>
+      <span>Mira los botones bajo la pantalla YouTube 3D o toca la pantalla • Mano abierta (1s) abre Inicio</span>
     </div>
   </div>
 

@@ -443,27 +443,33 @@ export class TelemetryBoard3D {
     ctx.fillText('MOBILEQUEST VR WEB  —  TELEMETRÍA FASE 2', 38, 34);
 
     const fmt = (n) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}°`;
+    const barrelLabel = data.forceDirectStereo
+      ? 'Directo (YouTube 3D)'
+      : data.barrelEnabled
+        ? 'ON'
+        : 'OFF';
     const lines = [
-      `RENDIMIENTO :  ${data.fps.toFixed(0)} FPS   |   Three.js + MediaPipe`,
-      `ÓPTICA VR   :  ${data.stereoEnabled ? 'Stereo VR (Izq/Der)' : 'Normal (Mono)'}  |  Barrel: ${data.barrelEnabled ? 'ON' : 'OFF'}  |  IPD: ${data.ipdMm.toFixed(1)} mm`,
+      `RENDIMIENTO :  ${data.fps.toFixed(0)} FPS   |   Three.js + MediaPipe + YouTube 3D`,
+      `ÓPTICA VR   :  ${data.stereoEnabled ? 'Stereo VR (Izq/Der)' : 'Normal (Mono)'}  |  Barrel: ${barrelLabel}  |  IPD: ${data.ipdMm.toFixed(1)} mm`,
       `CABEZA 3DoF :  ${data.sensorLabel}`,
       `ORIENTACIÓN :  Yaw ${fmt(data.euler.yaw)}    Pitch ${fmt(data.euler.pitch)}    Roll ${fmt(data.euler.roll)}`,
       `PASSTHROUGH :  ${data.passthroughStatus || 'Sala virtual 3D'}`,
       `MANOS REAL  :  ${data.handStatus}`,
+      `YOUTUBE 3D  :  ${data.youtubeStatus || 'Cerrado (abre desde Inicio → YouTube)'}`,
       `GESTO ACTIVO:  ${data.gestureLabel || '—'}   |   FOCO: ${data.targetLabel || 'Ninguno'}`,
       '',
-      'GESTOS REALES (CON CÁMARA ACTIVA):',
-      '  • Pinza (pulgar + índice) : Seleccionar botón o agarrar/soltar objeto 3D',
-      '  • Puño cerrado            : Agarrar objeto 3D apuntado con láser',
-      '  • Mano abierta (0.9s)     : Invocar Menú Flotante de Apps / Inicio',
+      'GESTOS REALES Y CINE 3D:',
+      '  • Pinza / Toque : Seleccionar botones 3D, YouTube 3D o agarrar objetos',
+      '  • Puño cerrado  : Agarrar objeto 3D apuntado con láser',
+      '  • Mano abierta  : Invocar Menú Flotante de Apps / Inicio',
     ];
 
-    ctx.font = '600 23px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-    let y = 98;
+    ctx.font = '600 22px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+    let y = 94;
     for (let i = 0; i < lines.length; i++) {
-      ctx.fillStyle = i >= 8 ? '#89c4ea' : '#eaf6ff';
+      ctx.fillStyle = i >= 9 ? '#89c4ea' : '#eaf6ff';
       ctx.fillText(lines[i], 38, y);
-      y += 42;
+      y += 40;
     }
 
     this.texture.needsUpdate = true;

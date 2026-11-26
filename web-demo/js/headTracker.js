@@ -324,6 +324,7 @@ export class HeadTracker {
     this.canvas.addEventListener('pointercancel', endPointer);
 
     window.addEventListener('keydown', (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
       this._keys.add(e.code);
     });
     window.addEventListener('keyup', (e) => {

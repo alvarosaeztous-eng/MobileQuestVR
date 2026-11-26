@@ -238,7 +238,7 @@ export class AppsMenu3D {
 
     ctx.fillStyle = 'rgba(154, 194, 228, 0.82)';
     ctx.font = '600 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText('Los iconos externos se abren en una nueva pestaña / app compatible de Android', 590, 386);
+    ctx.fillText('YouTube abre el Cine 3D en VR  •  Chrome y Google abren enlaces externos', 590, 386);
 
     const bgTex = new THREE.CanvasTexture(bgCanvas);
     bgTex.colorSpace = THREE.SRGBColorSpace;
@@ -259,9 +259,15 @@ export class AppsMenu3D {
       {
         id: 'youtube',
         title: 'YouTube',
-        subtitle: 'App / Web ↗',
+        subtitle: 'Cine 3D VR',
         icon: 'youtube',
-        onClick: () => this.actions.onOpenExternalApp('YouTube', 'https://m.youtube.com/'),
+        onClick: () => {
+          if (typeof this.actions.onOpenYouTubeVR === 'function') {
+            this.actions.onOpenYouTubeVR();
+          } else {
+            this.actions.onOpenExternalApp('YouTube', 'https://m.youtube.com/');
+          }
+        },
       },
       {
         id: 'google',
